@@ -1,22 +1,10 @@
-# Python Based Docker
-FROM python:latest
+FROM python:3.11-slim
 
-# Installing Packages
-RUN apt update && apt upgrade -y
-RUN apt install git curl python3-pip ffmpeg -y
+WORKDIR /app
 
-# Updating Pip Packages
-RUN pip3 install -U pip
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copying Requirements
-COPY requirements.txt /requirements.txt
+COPY . .
 
-# Installing Requirements
-RUN cd /
-RUN pip3 install -U -r requirements.txt
-RUN mkdir /auto-filter-bot-v3
-WORKDIR /auto-filter-bot-v3
-COPY start.sh /start.sh
-
-# Running auto-filter-bot-v3
-CMD ["/bin/bash", "/start.sh"]
+CMD ["python", "bot.py"]
