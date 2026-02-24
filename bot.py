@@ -1,55 +1,86 @@
-#!/usr/bin/env python3
-# Copyright (C) @ZauteKm
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+import os
+import json
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
+TOKEN = os.getenv("BOT_TOKEN")
 
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+FILM_DATEI = "filme.json"
+VIDEO_ORDNER = "videos"
 
-import logging
-import logging.config
+# Ordner erstellen falls nicht vorhanden
+if not os.path.exists(VIDEO_ORDNER):
+    os.makedirs(VIDEO_ORDNER)
 
-# Get logging configurations
-logging.config.fileConfig('logging.conf')
-logging.getLogger().setLevel(logging.ERROR)
+# Filme laden
+def lade_filme():
+    if not os.path.exists(FILM_DATEI):
+        return []
+    with open(FILM_DATEI, "r") as f:
+        return json.load(f)
 
-from pyrogram import Client, __version__
-from pyrogram.raw.all import layer
-from plugins import Media
-from config import SESSION, API_ID, API_HASH, BOT_TOKEN
-import pyromod.listen
+# Filme speichern
+def speichere_filme(filme):
+    with open(FILM_DATEI, "w") as f:
+        json.dump(filme, f)
 
-class Bot(Client):
+# Start Command
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🎬 Willkommen beim Film Manager!\n\nSende mir einfach einen Film 🎥")
 
-    def __init__(self):
-        super().__init__(
-            session_name=SESSION,
-            api_id=API_ID,
-            api_hash=API_HASH,
-            bot_token=BOT_TOKEN,
-            workers=50,
-            plugins={"root": "plugins"},
-            sleep_threshold=5,
-        )
+# Liste Command
+async def liste(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    filme = lade_filme()
 
-    async def start(self):
-        await super().start()
-        await Media.ensure_indexes()
-        me = await self.get_me()
-        self.username = '@' + me.username
-        print(f"{me.first_name} with for Pyrogram v{__version__} (Layer {layer}) started on {me.username}.")
+    if not filme:
+        await update.message.reply_text("Keine Filme gespeichert.")
+        return
 
-    async def stop(self, *args):
-        await super().stop()
-        print("Bot stopped. Bye.")
+    text = "📽️ Deine Filme:\n"
+    for film in filme:
+        text += f"\n🎬 {film['name']}"
 
+    await update.message.reply_text(text)
 
-app = Bot()
-app.run()
+# 🎥 VIDEO HANDLER (GANZ WICHTIG!)
+async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    video = update.message.video
+
+    file = await context.bot.get_file(video.file_id)
+
+    dateiname = f"{video.file_unique_id}.mp4"
+    pfad = os.path.join(VIDEO_ORDNER, dateiname)
+
+    await file.download_to_drive(pfad)
+
+    filme = lade_filme()
+    filme.append({
+        "name": dateiname,
+        "pfad": pfad
+    })
+
+    speichere_filme(filme)
+
+    await update.message.reply_text("✅ Film gespeichert!")
+
+# MAIN
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("liste", liste))
+
+    # 👇 Damit Videos funktionieren!
+    app.add_handler(MessageHandler(filters.VIDEO, video_handler))
+
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
