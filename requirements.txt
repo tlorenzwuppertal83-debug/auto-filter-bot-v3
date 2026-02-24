@@ -1,5 +1,4 @@
 pyrogram==2.0.106
-tgcrypto==1.2.2
 pymongo[srv]==4.6.1
 marshmallow==3.12.2
 requests
