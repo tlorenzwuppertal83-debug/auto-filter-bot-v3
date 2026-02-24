@@ -5,4 +5,4 @@ requests
 aiofiles
 dnspython==2.6.1
 flask
-gunicor
+gunicorn
